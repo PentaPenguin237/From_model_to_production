@@ -3,3 +3,6 @@ numpy
 scikit-learn
 joblib
 kagglehub
+fastapi
+uvicorn
+pydantic

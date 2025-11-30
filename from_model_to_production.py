@@ -184,7 +184,7 @@ def run_simulation(model):
             print(f"[ERROR] Prediction failed: {e}")
             # Print expected features for debugging
             if hasattr(model, "feature_names_in_"):
-                print(f"Model expects: {model.feature_names_in_}") fa
+                print(f"Model expects: {model.feature_names_in_}")
 
         time.sleep(1) 
 

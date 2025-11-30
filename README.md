@@ -1,14 +1,14 @@
 # Real-Time Anomaly Detection in an IoT-Enabled Factory
 **Course:** DLBDSMBTP01 - From Model to Production
-**Author:** Guglielmo Luraschi Sicca - Matriculation no.92125339
+**Author:** Guglielmo Luraschi Sicca
 
 ---
 
 ## 1. Project Overview
 
-This project implements a complete Machine Learning pipeline for anomaly detection in an industrial setting. It simulates a "Model-to-Production" workflow where sensor data is ingested, processed, and analyzed in real-time.
+This project implements a production-grade Machine Learning pipeline for anomaly detection in an industrial setting. It utilizes a **Microservices Architecture** to separate the intelligence (ML Model) from the data source (Sensors).
 
-The core objective is to detect potential equipment failures using an **Isolation Forest** algorithm. The system is fully containerized using Docker, ensuring reproducibility across different environments. It features automated data ingestion via the Kaggle API, robust feature engineering (handling Kelvin/Celsius conversion and synthetic humidity generation), and persistent model storage.
+The core objective is to detect potential equipment failures using an **Isolation Forest** algorithm exposed via a standardized **RESTful API**. The system is fully containerized using Docker, ensuring reproducibility and scalability.
 
 ---
 
@@ -19,14 +19,15 @@ The core objective is to detect potential equipment failures using an **Isolatio
 ├── docker/
 │   └── Dockerfile             <-- Docker configuration (Python 3.10 Slim)
 ├── data/
-│   └── predictive_maintenance.csv  <-- Automatically downloaded on first run
+│   └── predictive_maintenance.csv  <-- Automatically downloaded on startup
 ├── results/
 │   └── isolation_forest_model.joblib <-- Persisted model artifact
 ├── .gitignore                 <-- Git exclusion rules
-├── docker-compose.yml         <-- Container orchestration config
-├── from_model_to_production.py  <-- Main pipeline script
-├── requirements.txt             <-- Python dependencies
-└── README.md                    <-- Project documentation
+├── docker-compose.yml         <-- Orchestration (API Service)
+├── main.py                    <-- FastAPI Server (The "Production" App)
+├── simulate_sensors.py        <-- Client Simulation Script (The "Factory")
+├── requirements.txt           <-- Dependencies (FastAPI, Scikit-learn, etc.)
+└── README.md                  <-- Project documentation
 \`\`\`
 
 ---
@@ -36,7 +37,7 @@ The core objective is to detect potential equipment failures using an **Isolatio
 ### Prerequisites
 * [Docker Desktop](https://www.docker.com/get-started) (Running and updated)
 * [Docker Compose](https://docs.docker.com/compose/install/)
-* Internet connection (for initial data download)
+* Python 3.10+ (for running the client simulation locally)
 
 ### Setup Steps
 1.  **Clone the Repository**
@@ -47,53 +48,63 @@ The core objective is to detect potential equipment failures using an **Isolatio
 
 2.  **Data Setup**
     * **Manual action is NOT required.**
-    * The application includes an automated ingestion module. On the first launch, it checks the \`./data\` volume. If the dataset is missing, it automatically authenticates with KaggleHub, downloads the dataset, and persists it to the local disk.
+    * The application includes an automated ingestion module. On first launch, it checks the \`./data\` volume. If the dataset is missing, it automatically authenticates with KaggleHub, downloads the dataset, and persists it to the local disk.
 
 ---
 
-## 4. How to Run
+## 4. How to Run (Production Simulation)
 
-This project is optimized for Docker Compose.
+This project uses a Client-Server architecture. You will run the **API Server** in Docker and the **Sensor Simulation** on your local machine.
 
-1.  **Build the Environment**
-    Build the Docker image and install dependencies.
-    \`\`\`bash
-    docker compose build
-    \`\`\`
+### Step 1: Start the API Server
+This builds the container and starts the FastAPI service on Port 8000.
 
-2.  **Execute the Pipeline**
-    Start the container. This triggers the full lifecycle: Data Loading -> Feature Engineering -> Training -> Simulation.
-    \`\`\`bash
-    docker compose up
-    \`\`\`
-
-    *Output:* The terminal will display the training logs followed by a real-time simulation of sensor data streams. Anomalies will be flagged with a 🚨 alert.
-
-3.  **Clean Up**
-    To stop the execution and remove the container resources:
-    \`\`\`bash
-    docker compose down
-    \`\`\`
-
----
-
-## 5. Development & Debugging
-
-For developers wishing to modify the pipeline or debug interactively without rebuilding:
-
-**Interactive Shell**
-To open a terminal inside the container environment:
 \`\`\`bash
-docker compose run --rm --entrypoint bash app
+# Build and Start
+docker compose up --build
 \`\`\`
 
-**Workflow**
-The project uses volume mapping, meaning changes made to \`from_model_to_production.py\` on the host machine are immediately reflected inside the container.
-1.  Edit the script locally.
-2.  Run \`python from_model_to_production.py\` inside the interactive shell.
+*Wait until you see:* \`Uvicorn running on http://0.0.0.0:8000\`
+
+### Step 2: Run the Sensor Simulation
+Open a **new terminal window**. This script acts as the IoT Gateway, generating synthetic sensor data and sending it to the API.
+
+\`\`\`bash
+# Install client requirements (if needed)
+pip install requests
+
+# Start the factory simulation
+python simulate_sensors.py
+\`\`\`
+
+### Step 3: Observe Real-Time Monitoring
+Watch the output in your simulation terminal. You will see real-time JSON responses from the Docker container:
+
+\`\`\`text
+Sensor Sending: {'temperature_k': 301.4, 'rotational_speed_rpm': 1496.2}
+API Response:   NORMAL (Score: 0.157)
+...
+--- INJECTING ANOMALY (High RPM) ---
+Sensor Sending: {'temperature_k': 301.4, 'rotational_speed_rpm': 2800}
+API Response:   ALERT (Score: -0.18)
+\`\`\`
+
+### Step 4: Clean Up
+To stop the server and free resources:
+\`\`\`bash
+docker compose down
+\`\`\`
+
+---
+
+## 5. Architecture & Logic
+
+* **The Server (`main.py`):** A FastAPI application that loads the trained Isolation Forest model. It exposes a \`/predict\` endpoint that accepts JSON payloads validated by **Pydantic** models.
+* **The Model:** An unsupervised Isolation Forest trained on the *Predictive Maintenance* dataset. It learns the distribution of "normal" temperature and vibration (RPM) levels.
+* **The Client (`simulate_sensors.py`):** A Python script that generates a continuous stream of data using sine waves and random noise. It periodically injects synthetic anomalies (spikes in RPM) to validate the system's detection capabilities.
 
 ---
 
 ## 6. Results
 
-The model successfully identifies anomalies based on deviations in temperature, rotational speed (proxy for sound), and synthetic humidity. The final trained model is serialized and saved to \`results/isolation_forest_model.joblib\` for potential future deployment.
+The system successfully identifies anomalies in real-time with low latency. The Isolation Forest model correctly flags the injected high-RPM events as anomalies (Negative Scores), while classifying standard operating parameters as normal (Positive Scores).

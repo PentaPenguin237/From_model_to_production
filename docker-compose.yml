@@ -1,33 +1,16 @@
 version: '3.8'
 
 services:
-  # This is the name of your service, e.g., 'app' or 'project'
   app:
-    # Tells Docker Compose to build the image
     build:
-      # Use the Dockerfile from the 'docker' directory
       context: .
       dockerfile: docker/Dockerfile
-    
-    # This is the key part: Mount local folders into the container
+    # Expose the API port
+    ports:
+      - "8000:8000"
     volumes:
-      # Mount local './data' folder to '/data' inside the container, as well as ./results and ./app
       - ./data:/data:rw
       - ./results:/results:rw
-      - .:/app      
-    
-    # (Optional) Pass Kaggle API credentials as environment variables
-    # You must create a .env file for this to work
-    # env_file:
-    #   - .env:
-
-    # --- GPU CONFIGURATION (FOR FUTURE USE) ---
-    # If you were using a GPU library, you would uncomment this block
-    # to give the container access to your host's GPU.
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+      - .:/app
+    # START THE API SERVER by default
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
